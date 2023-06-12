@@ -7,35 +7,20 @@
 # Summary
 [summary]: #summary
 
-This RFC introduces a feature allowing the base type of enums and structs to be inferred in certain contexts including but not limited to function calls. The syntax is as follows `_::Variant`.
+This RFC introduces a feature allowing the base type of enums and structs to be inferred in contexts where strict typing information can be exist. Some examples of strict typing include match statements and function calls. The syntax is `_::EnumVariant` for enums, `_ { a: 1 }` for constructing structs, and `_::method()` for impls and traits wher `_` is the type.
 
 
 # Motivation
 [motivation]: #motivation
 
-Using large libraries usually requires developers to import large amounts of traits, structures, and enums. To just call a function on an implementation can take upwards of 3 imports. One way developers have solved this is by importing everything from specific modules. Importing everything has its own problems like trying to guess where imports are actually from. Developers need a low compromise solution to solve this problem and that comes in the form of inferred types.
-
-Swift has had a system to infer types since around 2014. Its system has been praised by many developers around the world. It’s system is as follows:
-```swift
-enum EnumExample {
-   case variant
-   case variant2
-}
-
-
-example(data: .variant);
-```
-
-This RFC’s intent was to create something similar to the system already tried and tested in swift. Additionally, the underscore is already used to imply type’s lifetimes so it runs consistent with the rust theme.
-
+Rust's goals include clean syntax, that comes with a consice syntax and features like macros making it easier to not repeat yourself. Having to write a type every time you want to do something can be very annoying, repetetive, and not to mention messy. This is a huge problem especialy in large projects with heavy dependency on enums. Additionaly, with large libraries developers can expect to import upwords from 3 traits, structures, and enums. One way developers have solved this is by importing everything from specific modules like [`windows-rs`](https://github.com/microsoft/windows-rs). This is problematic because at a glance, it can not be determined where a module comes from. It can be said that developers need a low compromise solution to solve the problem of large imports and messy code. The intent of this RFC’s is to create something that developer friendly yet still conforming to all of rust's goals.
 
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
+When crating a struct or enum, infered types can simplify the type into just a underscore. It is important to note, however, that they do not work when the type is not specific enough to be infered like: type parameters. Below are some examples where they do and don't work.
 
-Implied types basically replace the path to a type with `_`. They can be used in places where strong typing exists. This includes function calls and function returns. You can think about the `_` as expanding into the type’s name.
-
-Function calls (struct):
+Function calls (structs):
 ```rust
 fn my_function(data: MyStruct) { /* ... */ }
 
@@ -65,10 +50,17 @@ fn my_function() -> MyEnum {
 
 Match arms:
 ```rust
-match Example::One {
-   _::One => println!("One!"),
-   _::Two => println!("Two!")
-};
+enum Example {
+   One,
+   Two
+}
+
+fn my_fn(my_enum: Example) -> String {
+   match my_enum {
+      _::One => "One!",
+      _::Two => "Two!"
+   }
+}
 ```
 
 It is important to note that `_` only represents the type; if you have (for example) another enum that can be coerced into the type, you will need to specify it manually. Additionally, any traits required to call an impl will still have to be imported.
@@ -80,27 +72,16 @@ fn my_function(data: MyStruct) { /* ... */ }
 my_function(MyStruct2::do_something().into()); // ✅
 
 
-my_function(_::do_something().into()); // ❌ variant or associated item not found in `MyStruct`
+my_function(_::do_something().into()); // ❌ error[E0599]: variant or associated item not found in `MyStruct`
 ```
-
-When developing, an IDE will display the type’s name next to the underscore as an IDE hint similar to implied types. Reading and maintaining code should not be impacted because the function name should give context to the type.
 
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
 
-This RFC should not take much to implement as you can think of the `_` as if it was just expanding to a type based on the context and where it’s used. Anywhere with a strongly typed argument as mentioned above can be inferred. This additionally includes let and const statements with type definitions in the left hand side.
+The underscore operator infers the type of a stuct or enum where there is enough type information in a context in order to infer an exact type. In a statement like `_::Variant`, you can imagine the underscore to be the type. That means that anything you could do with an actual type like `MyEnum::Variant` will still apply in an infered enum. Ultimately, the enum or struct doesn't need to be imported but, traits and other specfied things will need to be imported.
 
-Here is an example of what should happen when compiling.
-```rust
-let var: MyEnum = _::Variant;
-```
-becomes:
-```rust
-let var = MyEnum::Variant;
-```
-
-One issue is getting the type of a given context mentioned in [rust-lang/rust#8995](https://github.com/rust-lang/rust/issues/8995).
+Due to how the rust compiler currently works, lots of changes will need to be made to allow paths to be infered in an order that allows for all of the mentioned. One issue is getting the type of a given context mentioned in [rust-lang/rust#8995](https://github.com/rust-lang/rust/issues/8995).
 
 Finally, here are some examples of non-strict typings that can not be allowed.
 ```rust
@@ -124,7 +105,7 @@ do_something(convert(_::new()))
 
 In the thread [[IDEA] Implied enum types](https://internals.rust-lang.org/t/idea-implied-enum-types/18349), many people had a few concerns about this feature. 
 
-These RFCs could create bugs. An example of this is if a function changes has two enum parameters that share common variant names. Because it’s implied, it would still compile with this bug causing UB.
+These RFCs could create bugs. An example of this is if a function changes has two enum parameters that share common variant names. Because it’s implied, it would still compile with this bug createing unintended behavior wharas by specifying the type names, the compiler would thrown an error.
 ```rust
 enum RadioState {
    Disabled,
@@ -146,11 +127,7 @@ Another issue with this is that the syntax `_::` could be mistaken for `::` mean
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-
-Maintainers should accept this proposal because it can simplify writing Rust code. Especially in enum heavy libraries like [windows-rs](https://github.com/microsoft/windows-rs). There have been many ideas for what this operator should be including `::` add `.`. Despite that, the underscore is the best because it has already been used to infer lifetimes. Additionally the underscore by itself can be used to construct a struct creating a consistent experience.
-
-
-If this RFC doesn’t happen, writing rust code will continue to feel bloated and old.
+There have been many ideas for what this operator should be including `::` add `.`. Despite that, the underscore is the best because it has already been used to infer lifetimes. Additionally the underscore by itself can be used to construct a struct creating a consistent experience. Maintainers should accept this proposal because it can simplify writing Rust code and prevent the large problem of reputition in switch statements. 
 
 
 # Prior art
@@ -159,13 +136,11 @@ If this RFC doesn’t happen, writing rust code will continue to feel bloated an
 
 Apple’s Swift had enum inference since 2014 and is not used in most swift codebases with no issues. One thing people have noticed, though, is that it could be used for so much more! That was quite limited and in creating a rust implementation, people need to extend what swift pioneered and make it more universal. That is why this RFC proposes to make the underscore a general operator that can be used outside the small use case of enums and allow it to be used in structs.
 
-
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
 
-A few kinks on this are whether it should be required to have the type in scope. Lots of people could point to traits and say that they should but others would disagree. From an individual standpoint, I don’t think it should require any imports but, it really depends on the implementers as personally, I am not an expert in *this* subject.
-
+The implementation of this feature still requires a deep dive into how exactly the compiler should resolve the typings to produce the expected behavior, however, algorithems for finding paths for do an already exist.
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
