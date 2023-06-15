@@ -7,7 +7,7 @@
 # Summary
 [summary]: #summary
 
-This RFC introduces a feature allowing the base type of enums and structs to be inferred in contexts where strict typing information can be exist. Some examples of strict typing include match statements and function calls. The syntax is `_::EnumVariant` for enums, `_ { a: 1 }` for constructing structs, and `_::method()` for impls and traits wher `_` is the type.
+This RFC introduces a feature allowing the base type of enums and structs to be inferred in contexts where strict typing information can be exist. Some examples of strict typing include match statements and function calls. The syntax is `_::EnumVariant` for enums, `_ { a: 1 }` for constructing structs, and `_::method()` for impls and traits where `_` is the type.
 
 
 # Motivation
