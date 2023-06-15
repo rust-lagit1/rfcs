@@ -127,7 +127,7 @@ Another issue with this is that the syntax `_::` could be mistaken for `::` mean
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-There have been many ideas for what this operator should be including `::` add `.`. Despite that, the underscore is the best because it has already been used to infer lifetimes. Additionally the underscore by itself can be used to construct a struct creating a consistent experience. Maintainers should accept this proposal because it can simplify writing Rust code and prevent the large problem of reputition in switch statements. 
+There have been many ideas for what this operator should be including `::` add `.`. Despite that, the underscore is the best because it has already been used to infer lifetimes and generic types. Additionally the underscore by itself can be used to construct a struct creating a consistent experience. Maintainers should accept this proposal because it can simplify writing Rust code and prevent the large problem of repitition in switch statements. 
 
 
 # Prior art
