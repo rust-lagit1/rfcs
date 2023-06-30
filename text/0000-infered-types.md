@@ -18,7 +18,7 @@ Rust's goals include clean syntax, that comes with a consice syntax and features
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
-When crating a struct or enum, infered types can simplify the type into just a underscore. It is important to note, however, that they do not work when the type is not specific enough to be infered like: type parameters. Below are some examples where they do and don't work.
+When crating a struct or enum, inferred types can simplify the type into just a underscore. It is important to note, however, that they do not work when the type is not specific enough to be inferred like: type parameters. Below are some examples where they do and don't work.
 
 Function calls (structs):
 ```rust
@@ -79,9 +79,8 @@ my_function(_::do_something().into()); // ❌ error[E0599]: variant or associate
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
 
-The underscore operator infers the type of a stuct or enum where there is enough type information in a context in order to infer an exact type. In a statement like `_::Variant`, you can imagine the underscore to be the type. That means that anything you could do with an actual type like `MyEnum::Variant` will still apply in an infered enum. Ultimately, the enum or struct doesn't need to be imported but, traits and other specfied things will need to be imported.
+The `_` token can be used to simplify writing the type name explicitly when the type of its containing expression is known. The elided type does not need to be imported into scope, but if the type is used in the path of an associated trait item, the trait still needs to be imported as `_` only introduces the type itself not the trait.
 
-Due to how the rust compiler currently works, lots of changes will need to be made to allow paths to be infered in an order that allows for all of the mentioned. One issue is getting the type of a given context mentioned in [rust-lang/rust#8995](https://github.com/rust-lang/rust/issues/8995).
 
 Finally, here are some examples of non-strict typings that can not be allowed.
 ```rust
@@ -140,7 +139,7 @@ Apple’s Swift had enum inference since 2014 and is not used in most swift code
 [unresolved-questions]: #unresolved-questions
 
 
-The implementation of this feature still requires a deep dive into how exactly the compiler should resolve the typings to produce the expected behavior, however, algorithems for finding paths for do an already exist.
+The implementation of this feature still requires a deep dive into how exactly the compiler should resolve the typings to produce the expected behaviour, however, algorithms for finding paths for inferred types already exist.
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
