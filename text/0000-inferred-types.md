@@ -1,0 +1,160 @@
+- Feature Name: Inferred Types
+- Start Date: 2023-06-06
+- RFC PR: [rust-lang/rfcs#0000](https://github.com/rust-lang/rfcs/pull/0000)
+- Rust Issue: [rust-lang/rust#0000](https://github.com/rust-lang/rust/issues/0000)
+
+
+# Summary
+[summary]: #summary
+
+This RFC introduces a feature allowing the base type of enumerations and structures to be inferred in contexts where strict typing information already exists. Some examples of strict typing include match statements and function calls. The syntax is `_::EnumVariant` for enumerations, `_ { a: 1 }` for constructing structs, and `_::method()` for implementations and traits, where `_` is the type.
+
+
+# Motivation
+[motivation]: #motivation
+
+Rust's goals include a clean syntax. Because of that, features like macros were created, making it easier to not repeat yourself. Having to write a type path every time you want to do something can be very annoying, repetitive, and, not to mention, hard to read. This is a huge problem, especially in large projects with heavy dependencies on enumerations. Additionally, with large libraries, developers can expect to import many traits, structures, and enumerations. One way developers have solved this is by importing everything from specific modules, like [`windows-rs`](https://github.com/microsoft/windows-rs). This is problematic because, at a glance, it can not be determined where a module comes from. It can be said that developers need a low-compromise solution to solve the problem of large imports and hard-to-read code. The intent of this RFC is to create something that is developer-friendly yet still conforms to all of Rust's goals. Finally, when using specific rust crates, it can be annoying to have to add one package specifically for a type definition (like `chrono`). Now it can be prevented!
+
+# Guide-level explanation
+[guide-level-explanation]: #guide-level-explanation
+
+When creating a struct or enumeration, inferred types can simplify the type to just an underscore. It is important to note, however, that they do not work when the type is not specific enough to be inferred, like type parameters. Below are some examples of when they do and don't work.
+
+Function calls (structs):
+```rust
+struct MyStruct {
+   value: usize
+}
+
+fn my_function(data: MyStruct) { /* ... */ }
+
+// my_function(MyStruct {
+//     value: 1
+// });
+my_function(_ {
+   value: 1
+});
+```
+
+Function calls (impl):
+```rust
+struct MyStruct {}
+
+impl MyStruct {
+   pub fn new() -> Self {
+      Self {}
+   }
+}
+
+fn my_function(data: MyStruct) { /* ... */ }
+
+// my_function(MyStruct::new()});
+my_function(_::new());
+```
+
+Function returns (enum):
+```rust
+fn my_function() -> MyEnum {
+   // MyEnum::MyVarient
+   _::MyVarient
+}
+```
+
+Match arms:
+```rust
+enum Example {
+   One,
+   Two
+}
+
+fn my_fn(my_enum: Example) -> String {
+   match my_enum {
+      _::One => "One!",
+      _::Two => "Two!"
+   }
+}
+```
+
+It is important to note that `_` only represents the type; if you have (for example) another enumeration that can be coerced into the type, you will need to specify it manually. Additionally, any traits required to call an implementation will still have to be imported.
+
+```rust
+fn my_function(data: MyStruct) { /* ... */ }
+
+
+my_function(MyStruct2::do_something().into()); // ✅
+
+
+my_function(_::do_something().into()); // ❌ error[E0599]: variant or associated item not found in `MyStruct`
+```
+
+
+# Reference-level explanation
+[reference-level-explanation]: #reference-level-explanation
+
+The `_` token can be used to simplify writing the type name explicitly when the type of its containing expression is known. The elided type does not need to be imported into scope, but if the type is used in the path of an associated trait item, the trait still needs to be imported as `_` only introduces the type itself, not the trait.
+
+
+Finally, here are some examples of non-strict typings that can not be allowed.
+```rust
+fn convert<T>(argument: T) -> Example {/* ... */}
+
+do_something(convert(_::new()))
+//                   ^^^^^^^^ Cannot infer type on generic type argument
+```
+
+However, ones where a generic argument can collapse into strict typing can be allowed. The below works because `T` becomes `Example`. This wouldn’t work if `do_something`, however, took a generic.
+```rust
+fn do_something(argument: Example) {/* ... */}
+fn convert<T>(argument: T) -> T {/* ... */}
+
+do_something(convert(_::new()))
+```
+
+
+# Drawbacks
+[drawbacks]: #drawbacks
+
+In the thread [[IDEA] Implied enum types](https://internals.rust-lang.org/t/idea-implied-enum-types/18349), many people had a few concerns about this feature. 
+
+These RFCs could cause bugs. An example of this is if a function has two enumeration parameters that share common variant names. Because it’s implied, it would still compile with this bug, creating unintended behavior, whereas by specifying the type names, the compiler would have thrown an error.
+```rust
+enum RadioState {
+   Disabled,
+   Enabled,
+}
+
+enum WifiConfig {
+   Disabled,
+   Reverse,
+   Enabled,
+}
+
+fn configure_wireless(radio: RadioState, wifi: WifiConfig) { /* ... */ }
+```
+
+Another issue with this is that the syntax `_::` could be mistaken for `::crate_name` meaning a crate path.
+
+
+# Rationale and alternatives
+[rationale-and-alternatives]: #rationale-and-alternatives
+
+There have been many ideas for what this operator should be, including `::` and `.`. Despite that, the underscore is the best because it has already been used to infer lifetimes and generic types. Additionally, the underscore by itself can be used to construct a structure, creating a consistent experience. Maintainers should accept this proposal because it can simplify writing Rust code and prevent the large problem of repetition in switch statements. 
+
+
+# Prior art
+[prior-art]: #prior-art
+
+
+Apple’s Swift has had enumeration inference since 2014 and is used in many Swift codebases. One thing people have noticed, though, is that it could be used for so much more! In creating a Rust implementation, the goal was to extend what Swift pioneered and make it more universal. That is why this RFC proposes to make the underscore a general operator that can be used outside the small use case of enumerations and allow it to be used in structs.
+
+# Unresolved questions
+[unresolved-questions]: #unresolved-questions
+
+
+The implementation of this feature still requires a deep dive into how exactly the compiler should resolve the typings to produce the expected behavior, however, algorithms for finding paths for inferred types already exist.
+
+# Future possibilities
+[future-possibilities]: #future-possibilities
+
+
+I can’t think of anything.
