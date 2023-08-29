@@ -7,7 +7,7 @@
 # Summary
 [summary]: #summary
 
-This RFC introduces a feature allowing the base type of enumerations and structures to be inferred in contexts where strict typing information already exists. Some examples of strict typing include match statements and function calls. The syntax is `_::EnumVariant` for enumerations, `_ { a: 1 }` for constructing structs, and `_::method()` for implementations and traits, where `_` is the type.
+This RFC introduces a feature allowing the base type of enumerations and structures to be inferred in contexts where strict typing information already exists. Some examples of strict typing include match statements and function calls. The syntax is `_::EnumVariant` for enumerations and `_ { a: 1 }` for constructing structs.
 
 
 # Motivation
@@ -18,7 +18,7 @@ Rust's goals include a clean syntax. Because of that, features like macros were 
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
-When creating a struct or enumeration, inferred types can simplify the type to just an underscore. It is important to note, however, that they do not work when the type is not specific enough to be inferred, like type parameters. Below are some examples of when they do and don't work.
+When creating a struct or enumeration, inferred types can simplify the type to just an underscore. It is important to note, however, that they do not allow any sort of interaction with implementations and they don't work when the type is not specific enough to be inferred, like type parameters. Below are some examples of when they do and don't work.
 
 Function calls (structs):
 ```rust
@@ -34,22 +34,6 @@ fn my_function(data: MyStruct) { /* ... */ }
 my_function(_ {
    value: 1
 });
-```
-
-Function calls (impl):
-```rust
-struct MyStruct {}
-
-impl MyStruct {
-   pub fn new() -> Self {
-      Self {}
-   }
-}
-
-fn my_function(data: MyStruct) { /* ... */ }
-
-// my_function(MyStruct::new()});
-my_function(_::new());
 ```
 
 Function returns (enum):
@@ -75,40 +59,75 @@ fn my_fn(my_enum: Example) -> String {
 }
 ```
 
-It is important to note that `_` only represents the type; if you have (for example) another enumeration that can be coerced into the type, you will need to specify it manually. Additionally, any traits required to call an implementation will still have to be imported.
+It is important to note that `_` only represents the type; if you have (for example) another enumeration that can be coerced into the type, you will need to specify it manually.
 
 ```rust
-fn my_function(data: MyStruct) { /* ... */ }
+enum MyEnum {
+    One,
+    Two
+}
+
+enum Example {
+    Alpha,
+    Bravo
+}
+
+impl Into<MyEnum> for Example {
+    fn into(self) -> MyEnum {
+        match self {
+            _::Alpha => _::One,
+            _::Bravo => _::Two
+        }
+    }
+}
+
+fn my_function(data: MyEnum) { /* ... */ }
 
 
-my_function(MyStruct2::do_something().into()); // ✅
+my_function(Example::Alpha.into()); // ✅
 
 
-my_function(_::do_something().into()); // ❌ error[E0599]: variant or associated item not found in `MyStruct`
+my_function(_::Alpha().into()); // ❌ 
 ```
 
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
 
-The `_` token can be used to simplify writing the type name explicitly when the type of its containing expression is known. The elided type does not need to be imported into scope, but if the type is used in the path of an associated trait item, the trait still needs to be imported as `_` only introduces the type itself, not the trait.
+The `_` token can be used to simplify writing the type name explicitly when the type of its containing expression is known. The elided type does not need to be imported into scope. The `_` token does not allow access to implementations and trait implementations of any sort.
+
+Mentioned above, implementations of any sort are not allowed
+```rust
+#[derive(Default)]
+struct MyStruct {
+    test: String
+}
+
+impl MyStruct {
+    fn new() -> Self {
+        Self {
+            test: "Hello!"
+        }
+    }
+}
+
+fn do_something(argument: MyStruct) {/* ... */}
+
+do_something(_::default())
+//           ^^^^^^^^^^^^ Cannot call implementations methods on infered types.
+do_something(_::new())
+//           ^^^^^^ Cannot call implementations methods on infered types.
+```
 
 
 Finally, here are some examples of non-strict typings that can not be allowed.
 ```rust
-fn convert<T>(argument: T) -> Example {/* ... */}
+fn do_something<T>(argument: T) -> Example {/* ... */}
 
-do_something(convert(_::new()))
-//                   ^^^^^^^^ Cannot infer type on generic type argument
+do_something(_ { test: "Hello" })
+//           ^^^^^^^^^^^^^^^^^^^ Cannot infer type on generic type argument
 ```
 
-However, ones where a generic argument can collapse into strict typing can be allowed. The below works because `T` becomes `Example`. This wouldn’t work if `do_something`, however, took a generic.
-```rust
-fn do_something(argument: Example) {/* ... */}
-fn convert<T>(argument: T) -> T {/* ... */}
-
-do_something(convert(_::new()))
-```
 
 
 # Drawbacks
@@ -134,6 +153,7 @@ fn configure_wireless(radio: RadioState, wifi: WifiConfig) { /* ... */ }
 
 Another issue with this is that the syntax `_::` could be mistaken for `::crate_name` meaning a crate path.
 
+Additionaly, the `_` opperator could confuse new users because new users may try to use the `_` opperator to try to access implementation methods.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
@@ -150,11 +170,9 @@ Apple’s Swift has had enumeration inference since 2014 and is used in many Swi
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-
 The implementation of this feature still requires a deep dive into how exactly the compiler should resolve the typings to produce the expected behavior, however, algorithms for finding paths for inferred types already exist.
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
 
-
-I can’t think of anything.
+Maybe in the future, implementation methods calls could be allowed.
