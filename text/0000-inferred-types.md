@@ -39,8 +39,8 @@ my_function(_ {
 Function returns (enum):
 ```rust
 fn my_function() -> MyEnum {
-   // MyEnum::MyVarient
-   _::MyVarient
+   // MyEnum::MyVariant
+   _::MyVariant
 }
 ```
 
