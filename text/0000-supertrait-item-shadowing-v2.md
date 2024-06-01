@@ -30,7 +30,7 @@ use itertools::Itertools as _;
 
 fn foo() -> impl Iterator<Item = &'static str> {
     "1,2,3".split(",").intersperse("|")
-    // ^ This is ambiguious: it could refer to Iterator::intersperse or Itertools::intersperse
+    // ^ This is ambiguous: it could refer to Iterator::intersperse or Itertools::intersperse
 }
 ```
 
