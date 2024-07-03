@@ -1,73 +1,81 @@
+
+<![endif]-->
+
 - Feature Name: Inferred Types
+
 - Start Date: 2023-06-06
+
 - RFC PR: [rust-lang/rfcs#0000](https://github.com/rust-lang/rfcs/pull/0000)
+
 - Rust Issue: [rust-lang/rust#0000](https://github.com/rust-lang/rust/issues/0000)
 
-
 # Summary
+
 [summary]: #summary
 
-This RFC introduces a feature allowing the base type of enumerations and structures to be inferred in contexts where strict typing information already exists. Some examples of strict typing include match statements and function calls. The syntax is `_::EnumVariant` for enumerations and `_ { a: 1 }` for constructing structs.
-
+This RFC introduces type inference via the underscore (`_`) syntax. Developers will be able to use the underscore (`_`) operator instead of writing out type names (e.g., `MyStruct`) to infer and construct `enum`s and `struct`s in function calls, match arms, and other places where significant type information is available. With this RFC, the following syntax will be available: `_::EnumVariant` and `_ { struct_field: 1 }`.
 
 # Motivation
+
 [motivation]: #motivation
 
-Rust's goals include a clean syntax. Because of that, features like macros were created, making it easier to not repeat yourself. Having to write a type path every time you want to do something can be very annoying, repetitive, and, not to mention, hard to read. This is a huge problem, especially in large projects with heavy dependencies on enumerations. Additionally, with large libraries, developers can expect to import many traits, structures, and enumerations. One way developers have solved this is by importing everything from specific modules, like [`windows-rs`](https://github.com/microsoft/windows-rs). This is problematic because, at a glance, it can not be determined where a module comes from. It can be said that developers need a low-compromise solution to solve the problem of large imports and hard-to-read code. The intent of this RFC is to create something that is developer-friendly yet still conforms to all of Rust's goals. Finally, when using specific rust crates, it can be annoying to have to add one package specifically for a type definition (like `chrono`). Now it can be prevented!
+Rust’s goals include having a concise syntax. Features such as macros were created for this reason; developers shouldn’t have to repeat themselves. Like this, having to write types to match arms, functions, and locations where the type is obvious can be both frustrating, repetitive, hard to read, and time-consuming. Existing solutions such as importing everything or importing types with a single character don’t cut it, as importing everything makes it hard to determine where types come from, and renaming types makes it hard to read. This problem is prevalent in libraries such as [`actix-web`](https://github.com/actix/actix-web/blob/e189e4a3bf60edeff5b5259d4f60488d943eebec/actix-http/src/ws/codec.rs#L123), it's inconvenient to write and hard to read the same type over and over. Developers need a low-compromise solution that is both readable and concise. This is the goal of this RFC: developing an agreeable syntax.
 
 # Guide-level explanation
+
 [guide-level-explanation]: #guide-level-explanation
 
-When creating a struct or enumeration, inferred types can simplify the type to just an underscore. It is important to note, however, that they do not allow any sort of interaction with implementations and they don't work when the type is not specific enough to be inferred, like type parameters. Below are some examples of when they do and don't work.
+When constructing a `struct` or `enum`, inferred types can lower the verbosity of the code; you don’t need to type the type name for everything. You can use the `_` operator instead, with `_::EnumVariant` for `enum`s and `_ { struct_field: 1 }` for `struct`s.
 
-Function calls (structs):
+Note: calling methods on `impl`s and `impl` traits are not supported.
+
+Function calls:
 ```rust
-struct MyStruct {
-   value: usize
+struct AppSettings {
+    pub enable_foobar: bool
 }
 
-fn my_function(data: MyStruct) { /* ... */ }
+fn update_settings(data: AppSettings) { /* ... */ }
 
-// my_function(MyStruct {
-//     value: 1
+// update_settings(AppSettings {
+//     enable_foobar: true
 // });
-my_function(_ {
-   value: 1
+update_settings(_ {
+    enable_foobar: true
 });
 ```
 
-Function returns (enum):
+Function returns:
 ```rust
 fn my_function() -> MyEnum {
-   // MyEnum::MyVariant
-   _::MyVariant
+    // MyEnum::MyVariant
+    _::MyVariant
 }
 ```
 
 Match arms:
 ```rust
 enum Example {
-   One,
-   Two
-}
-
-fn my_fn(my_enum: Example) -> String {
-   match my_enum {
-      _::One => "One!",
-      _::Two => "Two!"
-   }
-}
-```
-
-It is important to note that `_` only represents the type; if you have (for example) another enumeration that can be coerced into the type, you will need to specify it manually.
-
-```rust
-enum MyEnum {
     One,
     Two
 }
 
-enum Example {
+fn my_fn(my_enum: Example) -> String {
+    match my_enum {
+        _::One => "One!",
+        _::Two => "Two!"
+    }
+}
+```
+
+Note: that `_` only represents the type inferred from the function. Other types will have to be manually specified.
+```rust
+enum Numbers {
+    One,
+    Two
+}
+
+enum Letters {
     Alpha,
     Bravo
 }
@@ -81,98 +89,98 @@ impl Into<MyEnum> for Example {
     }
 }
 
-fn my_function(data: MyEnum) { /* ... */ }
+fn use_numbers(number: Numbers) { /* ... */ }
 
+use_numbers(Example::Alpha.into());
+//          ^^^^^^^^^^^^^^^^^^^^^ Valid code
 
-my_function(Example::Alpha.into()); // ✅
-
-
-my_function(_::Alpha().into()); // ❌ 
+use_numbers(_::Alpha.into());
+//          ^^^^^^^^^^^^^^^^^ error[E0599]: no variant or associated item named `Alpha` found for enum `Numbers` in the current scope
 ```
-
 
 # Reference-level explanation
+
 [reference-level-explanation]: #reference-level-explanation
 
-The `_` token can be used to simplify writing the type name explicitly when the type of its containing expression is known. The elided type does not need to be imported into scope. The `_` token does not allow access to implementations and trait implementations of any sort.
-
-Mentioned above, implementations of any sort are not allowed
-```rust
-#[derive(Default)]
+The underscore (`_`) syntax is designed to allow concise writing of rust code. Most of the time, it will just like when the type is written in a verbose way. The compiler will first look for the underscore token (`_`) followed by, optionally, type parameters (`::</* type & lifetime parameters */>`), then brackets (for `struct`s) or a variant (for `enum`s). Below are some variations of valid syntax.  
+  
+```rust  
+_::<&'static str>::EnumVariant(&"Hello, rust")  
+_::<&'static str> {  
+    field: &"Hello, rust"  
+}  
+_::EnumVariant  
+_ {  
+    field: 1  
+}  
+```  
+  
+Unlike explicitly writing the type, the underscore (`_`) syntax does not support accessing `impl` and `impl` trait data. This is because return types from `impl` methods may be different from the expected type of the variable, match arm, function call, etc… When the compiler encounters an attempt at accessing data that may be on an `impl`, it should recommend an explicit type declaration. Below is an example:  
+  
+```rust  
+#[derive(Default)]  
 struct MyStruct {
-    test: String
+    value: usize
 }
 
-impl MyStruct {
-    fn new() -> Self {
-        Self {
-            test: "Hello!"
-        }
-    }
-}
+let test: MyStruct = _::default();  
+//                   ^^^^^^^^^^ (example) Cannot access impl methods on inferred types. Help: replace `_` with ` MyStruct`.  
+```  
 
-fn do_something(argument: MyStruct) {/* ... */}
-
-do_something(_::default())
-//           ^^^^^^^^^^^^ Cannot call implementations methods on infered types.
-do_something(_::new())
-//           ^^^^^^ Cannot call implementations methods on infered types.
-```
-
-
-Finally, here are some examples of non-strict typings that can not be allowed.
-```rust
-fn do_something<T>(argument: T) -> Example {/* ... */}
-
-do_something(_ { test: "Hello" })
-//           ^^^^^^^^^^^^^^^^^^^ Cannot infer type on generic type argument
-```
-
-
+Anywhere where a type can be inferred, this syntax is allowed. This includes variable definitions, match arms, function calls, struct fields, and enum variants.
 
 # Drawbacks
+
 [drawbacks]: #drawbacks
 
-In the thread [[IDEA] Implied enum types](https://internals.rust-lang.org/t/idea-implied-enum-types/18349), many people had a few concerns about this feature. 
+In the thread [[IDEA] Implied enum types](https://internals.rust-lang.org/t/idea-implied-enum-types/18349), many people had a few concerns about this feature.
 
-These RFCs could cause bugs. An example of this is if a function has two enumeration parameters that share common variant names. Because it’s implied, it would still compile with this bug, creating unintended behavior, whereas by specifying the type names, the compiler would have thrown an error.
+This feature could cause bugs. An example of this is if a function has two enumeration parameters that share common variant names. Using implied types here would make it impossible to know which settings are being set to what (without looking at the function signature).
+
 ```rust
 enum RadioState {
-   Disabled,
-   Enabled,
+    Disabled,
+    Enabled,
 }
 
 enum WifiConfig {
-   Disabled,
-   Reverse,
-   Enabled,
+    Disabled,
+    Reverse,
+    Enabled,
 }
 
 fn configure_wireless(radio: RadioState, wifi: WifiConfig) { /* ... */ }
+
+// Hard to understand without function signature
+configure_wireless(_::Disabled, _::Enable);
 ```
 
 Another issue with this is that the syntax `_::` could be mistaken for `::crate_name` meaning a crate path.
 
-Additionaly, the `_` opperator could confuse new users because new users may try to use the `_` opperator to try to access implementation methods.
+Additionally, the `_` operator could confuse new users because new users may try to use the `_` operator to try to access implementation methods.
 
 # Rationale and alternatives
+
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-There have been many ideas for what this operator should be, including `::` and `.`. Despite that, the underscore is the best because it has already been used to infer lifetimes and generic types. Additionally, the underscore by itself can be used to construct a structure, creating a consistent experience. Maintainers should accept this proposal because it can simplify writing Rust code and prevent the large problem of repetition in switch statements. 
+There have been many ideas for what this operator should be, including `::` and `.`. Despite that, the underscore is the best because it has already been used to infer lifetimes and generic types. Additionally, the underscore by itself can be used to construct `struct`s, creating a consistent experience.
 
+As mentioned in the motivation, this would make code more concise and easier to read by removing the need to repeat type names already obvious.
 
 # Prior art
-[prior-art]: #prior-art
 
+[prior-art]: #prior-art
 
 Apple’s Swift has had enumeration inference since 2014 and is used in many Swift codebases. One thing people have noticed, though, is that it could be used for so much more! In creating a Rust implementation, the goal was to extend what Swift pioneered and make it more universal. That is why this RFC proposes to make the underscore a general operator that can be used outside the small use case of enumerations and allow it to be used in structs.
 
 # Unresolved questions
+
 [unresolved-questions]: #unresolved-questions
 
-The implementation of this feature still requires a deep dive into how exactly the compiler should resolve the typings to produce the expected behavior, however, algorithms for finding paths for inferred types already exist.
+The implementation of this feature still requires a deep dive into how exactly the compiler should resolve the typings. It may require a rewrite of how types are resolved within the compiler.
 
 # Future possibilities
+
 [future-possibilities]: #future-possibilities
 
-Maybe in the future, implementation methods calls could be allowed.
+In the future, implementation methods calls could be allowed in certain cases with certain rules.
