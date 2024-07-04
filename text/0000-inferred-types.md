@@ -92,7 +92,7 @@ use_numbers(_::Alpha.into());
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
 
-The underscore (`_`) syntax is designed to allow concise writing of rust code. Most of the time, it will just like when the type is written in a verbose way. The compiler will first look for the underscore token (`_`) followed by, optionally, type parameters (`::</* type & lifetime parameters */>`), then brackets (for `struct`s) or a variant (for `enum`s). Below are some variations of valid syntax.  
+The underscore (`_`) syntax is designed to allow concise writing of rust code. Most of the time, it is just like when the type is written explicitly. The compiler will first look for the underscore token (`_`) followed by, optionally, type parameters (`::</* type & lifetime parameters */>`), then brackets (for `struct`s) or a variant (for `enum`s). Below are some variations of valid syntax.  
   
 ```rust  
 _::<&'static str>::EnumVariant(&"Hello, rust")  
@@ -105,7 +105,7 @@ _ {
 }  
 ```  
   
-Unlike explicitly writing the type, the underscore (`_`) syntax does not support accessing `impl` and `impl` trait data. This is because return types from `impl` methods may be different from the expected type of the variable, match arm, function call, etc… When the compiler encounters an attempt at accessing data that may be on an `impl`, it should recommend an explicit type declaration. Below is an example:  
+Unlike explicitly writing the type, the underscore (`_`) syntax does not support accessing `impl` and `impl` trait data. This is because return types from `impl` methods may be different from the expected type of the variable, match arm, function call, etc…
   
 ```rust  
 #[derive(Default)]  
@@ -117,7 +117,68 @@ let test: MyStruct = _::default();
 //                   ^^^^^^^^^^ (example) Cannot access impl methods on inferred types. Help: replace `_` with ` MyStruct`.  
 ```  
 
-Anywhere where a type can be inferred, this syntax is allowed. This includes variable definitions, match arms, function calls, struct fields, and enum variants.
+Below are the places where types can be inferred, along with the `struct`s and `enum`s used for the examples.
+
+Type definitions:
+```rust
+use std::default::Default;
+
+#[derive(Default)]
+struct FerrisData {
+    pub alive: bool,
+    pub mood: FerrisMood
+}
+
+#[derive(Default)]
+enum FerrisMood {
+    #[default]
+    Happy,
+    Sad,
+    Angry,
+    Unknown(Option<u8>)
+}
+```
+
+
+Inferable locations:
+- Variable Definitions:
+  ```rust
+  let value: usize = 2;
+  let data: FerrisMood = match value {
+      0 => _::Happy,
+      1 => _::Sad,
+      2 => _::Angry,
+      num => _::Unknown(Some(num))
+  };
+  let happy: FerrisMood = _::Happy;
+  ```
+- Match arms:
+  ```rust
+  let value: FerrisMood = _::Happy;
+  let data = match value {
+      _::Happy => 0,
+      _::Sad => 1,
+      _::Angry => 2,
+      _::Unknown(option) => option.unwrap_or(3)
+  };
+  ```
+- Function calls:
+  ```rust
+  fn say_mood(mood: FerrisMood) {}
+  say_mood(_::Happy);
+  ```
+- Struct fields:
+  ```rust
+  let data = FerrisData {
+        mood: _::Happy,
+        ..FerrisData::default()
+  };
+  ```
+- Enum variants:
+  ```rust
+  let data = FerrisMood::Unknown(_::Some(1));
+  ```
+
 
 # Drawbacks
 [drawbacks]: #drawbacks
