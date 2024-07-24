@@ -73,7 +73,7 @@ Today that example will give an ambiguity error because `method` is provided by 
 # Drawbacks
 [drawbacks]: #drawbacks
 
-This behavior can be surprising: adding a method to a sub-trait can change which function is called in unrelated code. This is mitigated by the which warns users about the potential ambiguity.
+This behavior can be surprising: adding a method to a sub-trait can change which function is called in unrelated code. This is mitigated by the lint which warns users about the potential ambiguity.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
